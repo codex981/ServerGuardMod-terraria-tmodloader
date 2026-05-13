@@ -1,0 +1,21 @@
+ServerGuard - نظام حماية سيرفر متكامل
+
+=== المميزات الرئيسية ===
+✅ نظام تسجيل دخول إجباري
+✅ بيانات اللاعب محفوظة على السيرفر فقط (Server-Side)
+✅ Anti-Cheat يكشف تعديل HP / Mana / Coins / Items
+✅ صلاحيات أدمن قوية جداً
+✅ كشف البرامج التي تعدل الذاكرة
+✅ منع الحركة والتكسير بدون تسجيل دخول
+
+=== أوامر الأدمن ===
+/sg login <password>
+/sg register <password>
+/sg kick <player>
+/sg ban <player>
+/sg god <player>
+/sg give <player> <itemID> <stack>
+/sg tp <player>
+/sg freeze <player>
+/sg setpass <player> <newpass>
+/sg reload

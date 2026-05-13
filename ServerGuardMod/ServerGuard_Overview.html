@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>ServerGuard Mod - نظرة عامة</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0a0e1a;
+    color: #e0e6f0;
+    padding: 20px;
+    font-size: 14px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    color: #ffd700;
+    text-shadow: 0 0 20px rgba(255,215,0,0.5);
+    padding: 20px 0 10px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #7ecfff;
+    margin-bottom: 30px;
+    font-size: 13px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    max-width: 1100px;
+    margin: 0 auto 30px;
+  }
+  .card {
+    background: #131929;
+    border: 1px solid #2a3a5c;
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #2a3a5c;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card.gold h2  { color: #ffd700; border-color: #4a3a00; }
+  .card.blue h2  { color: #7ecfff; border-color: #1a3a5c; }
+  .card.green h2 { color: #5dde7a; border-color: #1a3a1a; }
+  .card.red h2   { color: #ff6b6b; border-color: #3a1a1a; }
+  .card.purple h2{ color: #c07aff; border-color: #2a1a4a; }
+  .card.cyan h2  { color: #5ddddd; border-color: #1a3a3a; }
+
+  .file-list { list-style: none; }
+  .file-list li {
+    padding: 5px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .file-list li:nth-child(odd) { background: rgba(255,255,255,0.03); }
+  .fname { color: #7ecfff; font-family: monospace; min-width: 180px; }
+  .fdesc { color: #aab; font-size: 11px; }
+
+  .cmd-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .cmd-table tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+  .cmd-table td { padding: 5px 8px; border-bottom: 1px solid #1a2a3a; }
+  .cmd-table td:first-child { color: #5ddd7a; font-family: monospace; white-space: nowrap; }
+
+  .flow-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .flow-step {
+    background: rgba(255,255,255,0.04);
+    border-right: 3px solid #ffd700;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    position: relative;
+  }
+  .flow-step .step-num {
+    color: #ffd700;
+    font-weight: bold;
+    margin-left: 6px;
+  }
+
+  .threat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #1a2a3a;
+    font-size: 12px;
+  }
+  .threat-row:last-child { border-bottom: none; }
+  .threat { color: #ff6b6b; }
+  .solution { color: #5dde7a; font-size: 11px; text-align: left; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    margin: 2px;
+  }
+  .badge.server { background: #1a3a5c; color: #7ecfff; }
+  .badge.client { background: #1a3a1a; color: #5dde7a; }
+
+  .stats-row {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 10px;
+  }
+  .stat-item { text-align: center; }
+  .stat-num { font-size: 28px; font-weight: bold; color: #ffd700; }
+  .stat-label { font-size: 10px; color: #778; }
+
+  .arch-diagram {
+    text-align: center;
+    padding: 10px;
+  }
+  .arch-box {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 6px;
+    margin: 4px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+  .arch-server { background: #1a3060; border: 1px solid #3a5aaa; color: #7ecfff; }
+  .arch-client { background: #1a3a1a; border: 1px solid #3a7a3a; color: #5dde7a; }
+  .arch-db     { background: #3a2000; border: 1px solid #8a5000; color: #ffd700; }
+  .arch-arrow  { color: #556; font-size: 18px; display: block; }
+</style>
+</head>
+<body>
+
+<h1>🛡 ServerGuard Mod</h1>
+<p class="subtitle">نظام حماية سيرفر متكامل لـ tModLoader 1.4.4 | Anti-Cheat + Admin System + Server-Side Data</p>
+
+<div class="grid">
+
+  <!-- الإحصائيات -->
+  <div class="card gold" style="grid-column: 1 / -1;">
+    <h2>📊 نظرة عامة على المود</h2>
+    <div class="stats-row">
+      <div class="stat-item"><div class="stat-num">9</div><div class="stat-label">ملفات C#</div></div>
+      <div class="stat-item"><div class="stat-num">5</div><div class="stat-label">أنظمة حماية</div></div>
+      <div class="stat-item"><div class="stat-num">15</div><div class="stat-label">أمر أدمن</div></div>
+      <div class="stat-item"><div class="stat-num">7</div><div class="stat-label">أنواع كشف الغش</div></div>
+      <div class="stat-item"><div class="stat-num">∞</div><div class="stat-label">لاعبون مدعومون</div></div>
+    </div>
+  </div>
+
+  <!-- قائمة الملفات -->
+  <div class="card blue">
+    <h2>📁 هيكل الملفات</h2>
+    <ul class="file-list">
+      <li><span class="fname">ServerGuardMod.cs</span><span class="fdesc">الكلاس الرئيسي - نقطة الدخول</span></li>
+      <li><span class="fname">AccountDatabase.cs</span><span class="fdesc">قاعدة البيانات + SHA256 للكلمات</span></li>
+      <li><span class="fname">SGPlayer.cs</span><span class="fdesc">بيانات اللاعب + Anti-Cheat</span></li>
+      <li><span class="fname">ClientLoginSystem.cs</span><span class="fdesc">نظام الدخول على الكلايانت</span></li>
+      <li><span class="fname">LoginUI.cs</span><span class="fdesc">الواجهة المرئية لتسجيل الدخول</span></li>
+      <li><span class="fname">ServerLoadSystem.cs</span><span class="fdesc">تحميل/حفظ عند بدء/إيقاف السيرفر</span></li>
+      <li><span class="fname">SGCommand.cs</span><span class="fdesc">15 أمر أدمن كاملة</span></li>
+      <li><span class="fname">MemoryWatcher.cs</span><span class="fdesc">مراقبة الذاكرة المتقدمة</span></li>
+      <li><span class="fname">PacketFilter.cs</span><span class="fdesc">فلتر الباكيتات + Rate Limiting</span></li>
+      <li><span class="fname">PacketHandler.cs</span><span class="fdesc">معالج رسائل الشبكة</span></li>
+    </ul>
+  </div>
+
+  <!-- معمارية النظام -->
+  <div class="card purple">
+    <h2>🏗 معمارية النظام (Server-Side Data)</h2>
+    <div class="arch-diagram">
+      <div class="arch-box arch-client">💻 كلايانت<br><small>يرسل طلبات فقط</small></div>
+      <span class="arch-arrow">⬆ طلب login / ⬇ بيانات من السيرفر</span>
+      <div class="arch-box arch-server">🖥 السيرفر<br><small>يتحكم بكل شيء</small></div>
+      <span class="arch-arrow">⬇ قراءة / كتابة</span>
+      <div class="arch-box arch-db">🗄 accounts.json<br><small>الحقيقة الوحيدة</small></div>
+    </div>
+    <div style="margin-top: 12px; font-size: 11px; color: #aaa;">
+      <p>✅ HP / Items / Position → محفوظة على السيرفر</p>
+      <p>✅ الكلايانت يستقبل البيانات ولا يرسلها</p>
+      <p>✅ أي تعديل على الكلايانت يُكتشف ويُصحَّح</p>
+    </div>
+  </div>
+
+  <!-- تدفق تسجيل الدخول -->
+  <div class="card green">
+    <h2>🔄 تدفق تسجيل الدخول</h2>
+    <div class="flow-box">
+      <div class="flow-step"><span class="step-num">1.</span> لاعب يدخل السيرفر</div>
+      <div class="flow-step"><span class="step-num">2.</span> السيرفر يجمّده تماماً (لا حركة، لا تكسير)</div>
+      <div class="flow-step"><span class="step-num">3.</span> يُرسل له رسالة "تسجيل الدخول مطلوب"</div>
+      <div class="flow-step"><span class="step-num">4.</span> تظهر شاشة الدخول/التسجيل للاعب</div>
+      <div class="flow-step"><span class="step-num">5.</span> اللاعب يكتب اسمه وكلمة مروره</div>
+      <div class="flow-step"><span class="step-num">6.</span> السيرفر يتحقق من SHA256 Hash</div>
+      <div class="flow-step"><span class="step-num">7.</span> السيرفر يُطبّق بياناته (HP, Items, Pos)</div>
+      <div class="flow-step"><span class="step-num">8.</span> اللاعب يدخل اللعبة بحريّة ✅</div>
+    </div>
+  </div>
+
+  <!-- نظام Anti-Cheat -->
+  <div class="card red">
+    <h2>🔒 أنظمة Anti-Cheat</h2>
+    <div class="threat-row">
+      <span class="threat">⚡ Cheat Engine (HP)</span>
+      <span class="solution">السيرفر يصحّح القيمة كل 10 تيك</span>
+    </div>
+    <div class="threat-row">
+      <span class="threat">⚡ Cheat Engine (Coins)</span>
+      <span class="solution">مقارنة قيمة المخزن مع السجل</span>
+    </div>
+    <div class="threat-row">
+      <span class="threat">⚡ Item Injection</span>
+      <span class="solution">كل غرض يُقارن مع DB السيرفر</span>
+    </div>
+    <div class="threat-row">
+      <span class="threat">⚡ Speed Hack</span>
+      <span class="solution">فحص السرعة - إيقاف إذا زادت</span>
+    </div>
+    <div class="threat-row">
+      <span class="threat">⚡ NoClip</span>
+      <span class="solution">فحص الموقع - إعادة للموقع الآمن</span>
+    </div>
+    <div class="threat-row">
+      <span class="threat">⚡ Packet Flood</span>
+      <span class="solution">Rate Limiting: 600 باكيت/ثانية</span>
+    </div>
+    <div class="threat-row">
+      <span class="threat">⚡ Packet Injection</span>
+      <span class="solution">فلتر الباكيتات قبل تسجيل الدخول</span>
+    </div>
+  </div>
+
+  <!-- أوامر الأدمن -->
+  <div class="card cyan">
+    <h2>👑 أوامر الأدمن</h2>
+    <table class="cmd-table">
+      <tr><td>/sg kick &lt;اسم&gt;</td><td>طرد لاعب</td></tr>
+      <tr><td>/sg ban &lt;اسم&gt;</td><td>حظر دائم</td></tr>
+      <tr><td>/sg unban &lt;اسم&gt;</td><td>إلغاء حظر</td></tr>
+      <tr><td>/sg god [اسم]</td><td>وضع الألوهية</td></tr>
+      <tr><td>/sg give &lt;اسم&gt; &lt;ID&gt; &lt;كمية&gt;</td><td>إعطاء غرض</td></tr>
+      <tr><td>/sg tp &lt;اسم&gt;</td><td>نقل فوري</td></tr>
+      <tr><td>/sg freeze &lt;اسم&gt;</td><td>تجميد لاعب</td></tr>
+      <tr><td>/sg setadmin &lt;اسم&gt; true</td><td>ترقية أدمن</td></tr>
+      <tr><td>/sg setpass &lt;اسم&gt; &lt;كلمة&gt;</td><td>تغيير كلمة المرور</td></tr>
+      <tr><td>/sg online</td><td>قائمة المتصلين</td></tr>
+      <tr><td>/sg accounts</td><td>جميع الحسابات</td></tr>
+      <tr><td>/sg broadcast &lt;رسالة&gt;</td><td>إعلان عام</td></tr>
+      <tr><td>/sg info &lt;اسم&gt;</td><td>معلومات حساب</td></tr>
+      <tr><td>/sg save</td><td>حفظ فوري</td></tr>
+      <tr><td>/sg reload</td><td>إعادة تحميل DB</td></tr>
+    </table>
+  </div>
+
+  <!-- ما يُحفظ على السيرفر -->
+  <div class="card gold">
+    <h2>💾 البيانات المحفوظة على السيرفر</h2>
+    <ul class="file-list">
+      <li><span class="fname">Username</span><span class="fdesc">اسم الحساب</span></li>
+      <li><span class="fname">PasswordHash</span><span class="fdesc">كلمة المرور - SHA256 مشفّرة</span></li>
+      <li><span class="fname">StatLife / StatLifeMax</span><span class="fdesc">نقاط HP الحقيقية</span></li>
+      <li><span class="fname">StatMana / StatManaMax</span><span class="fdesc">نقاط Mana الحقيقية</span></li>
+      <li><span class="fname">Inventory[59]</span><span class="fdesc">كل المخزن (ID + Stack + Prefix)</span></li>
+      <li><span class="fname">PosX / PosY</span><span class="fdesc">آخر موقع في الخريطة</span></li>
+      <li><span class="fname">IsAdmin / IsBanned</span><span class="fdesc">الصلاحيات والحظر</span></li>
+      <li><span class="fname">LastLogin / LastIP</span><span class="fdesc">معلومات آخر جلسة</span></li>
+      <li><span class="fname">LoginCount</span><span class="fdesc">عدد مرات الدخول</span></li>
+    </ul>
+  </div>
+
+</div>
+
+<div style="text-align:center; color: #445; font-size: 11px; padding: 20px 0;">
+  ServerGuard Mod | tModLoader 1.4.4.9 | Anti-Cheat + Server-Side Data + Admin System
+</div>
+
+</body>
+</html>
