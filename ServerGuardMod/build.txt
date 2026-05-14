@@ -1,5 +1,5 @@
 author = YourName
-version = 1.0.0
-displayName = ServerGuard - Anti Cheat & Admin System
+version = 1.0.2
+displayName = ServerGuard - Anti Cheat & Admin System (Beta 2)
 description = Full server protection system with Anti-Cheat, Admin Commands, and Server-Side Data storage.
 homepage = 

@@ -146,6 +146,19 @@ namespace ServerGuardMod.Common.Network
             string username = reader.ReadString();
             string password = reader.ReadString();
 
+            // Validate Username (English letters and numbers only)
+            if (!System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$"))
+            {
+                SendFail(whoAmI, "Username must be English letters/numbers only");
+                return;
+            }
+
+            if (username.Length < 3 || password.Length < 3)
+            {
+                SendFail(whoAmI, "Username and password must be at least 3 chars");
+                return;
+            }
+
             var player   = Main.player[whoAmI];
             var sgPlayer = player.GetModPlayer<SGPlayer>();
 
@@ -158,7 +171,6 @@ namespace ServerGuardMod.Common.Network
                 return;
             }
 
-            // Validate length server-side as well
             if (username.Length < 3 || password.Length < 4)
             {
                 SendFail(whoAmI, "Username must be 3+ chars, password 4+ chars");

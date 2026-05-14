@@ -86,7 +86,10 @@ namespace ServerGuardMod.Common.Commands
                 case "setadmin":   CmdSetAdmin(caller, args);   break;
                 case "setpass":    CmdSetPass(caller, args);    break;
                 case "online":     CmdOnline(caller);           break;
-                case "accounts":   CmdAccounts(caller);         break;
+                case "account":
+                case "accounts":   CmdAccounts(caller, args);   break;
+                case "inv":
+                case "showme":     CmdShowMe(caller, args);     break;
                 case "broadcast":  CmdBroadcast(caller, args);  break;
                 case "info":       CmdPlayerInfo(caller, args); break;
                 case "save":
@@ -191,7 +194,8 @@ namespace ServerGuardMod.Common.Commands
             caller.Reply("/sg setadmin <name> <true/false>", Color.White);
             caller.Reply("/sg setpass <name> <password>", Color.White);
             caller.Reply("/sg online", Color.White);
-            caller.Reply("/sg accounts", Color.White);
+            caller.Reply("/sg accounts [page]", Color.White);
+            caller.Reply("/sg inv <name>                    - Inspect inventory UI", Color.White);
             caller.Reply("/sg broadcast <message>", Color.White);
             caller.Reply("/sg info <name>", Color.White);
             caller.Reply("/sg logpath                       - Show log folder path", Color.White);
@@ -207,7 +211,12 @@ namespace ServerGuardMod.Common.Commands
             if (args.Length < 2) { caller.Reply("Usage: /sg kick <name> [reason]", Color.Red); return; }
             string reason = args.Length > 2 ? string.Join(" ", args[2..]) : "Kicked by admin";
             var target    = FindPlayer(args[1]);
-            if (target == null) { caller.Reply($"Player '{args[1]}' not found online", Color.Red); return; }
+            
+            if (target == null) 
+            { 
+                caller.Reply($"Player '{args[1]}' not found online", Color.Red); 
+                return; 
+            }
 
             NetMessage.SendData(MessageID.Kick, target.whoAmI, -1,
                 Terraria.Localization.NetworkText.FromLiteral(reason));
@@ -224,15 +233,37 @@ namespace ServerGuardMod.Common.Commands
             if (args.Length < 2) { caller.Reply("Usage: /sg ban <name> [reason]", Color.Red); return; }
             string reason = args.Length > 2 ? string.Join(" ", args[2..]) : "Banned";
 
-            bool found = AccountDatabase.BanPlayer(args[1], reason);
-            if (!found) { caller.Reply($"Account '{args[1]}' not found in database", Color.Red); return; }
-
-            var onlineTarget = FindPlayer(args[1]);
+            string targetName = args[1];
+            var onlineTarget = FindPlayer(targetName);
+            
+            // If they are online, we can get their account name if registered
             if (onlineTarget != null)
+            {
+                var sgPlayer = onlineTarget.GetModPlayer<SGPlayer>();
+                if (sgPlayer.IsLoggedIn && !string.IsNullOrEmpty(sgPlayer.Username))
+                {
+                    targetName = sgPlayer.Username;
+                }
+            }
+
+            bool found = AccountDatabase.BanPlayer(targetName, reason);
+            
+            if (onlineTarget != null)
+            {
                 NetMessage.SendData(MessageID.Kick, onlineTarget.whoAmI, -1,
                     Terraria.Localization.NetworkText.FromLiteral($"Banned: {reason}"));
+                caller.Reply($"Banned and kicked {onlineTarget.name}: {reason}", Color.Green);
+            }
+            else if (found)
+            {
+                caller.Reply($"Banned offline account {targetName}: {reason}", Color.Green);
+            }
+            else
+            {
+                caller.Reply($"Account '{targetName}' not found, and player not online.", Color.Red);
+                return;
+            }
 
-            caller.Reply($"Banned {args[1]}: {reason}", Color.Green);
             Main.NewText($"[ServerGuard] {args[1]} was banned: {reason}", Color.Red);
         }
 
@@ -255,9 +286,17 @@ namespace ServerGuardMod.Common.Commands
             Player target = (found != null) ? found : caller.Player;
             if (target == null) { caller.Reply("Player not found", Color.Red); return; }
 
-            target.statLife = target.statLifeMax;
-            target.immune   = !target.immune;
-            caller.Reply($"God mode for {target.name}: {(target.immune ? "ON" : "OFF")}", Color.Gold);
+            var sg = target.GetModPlayer<SGPlayer>();
+            sg.IsGodMode = !sg.IsGodMode;
+            
+            // Also heal them fully when enabling god mode
+            if (sg.IsGodMode)
+            {
+                target.statLife = target.statLifeMax2;
+                target.HealEffect(target.statLifeMax2);
+            }
+
+            caller.Reply($"God mode for {target.name}: {(sg.IsGodMode ? "ON" : "OFF")}", Color.Gold);
         }
 
         // ================================================================
@@ -366,16 +405,37 @@ namespace ServerGuardMod.Common.Commands
         }
 
         // ================================================================
-        // LIST ACCOUNTS
+        // ACCOUNTS (Paginated)
         // ================================================================
-        private void CmdAccounts(CommandCaller caller)
+        private void CmdAccounts(CommandCaller caller, string[] args)
         {
-            caller.Reply("====== All Accounts ======", Color.Gold);
-            foreach (var acc in AccountDatabase.GetAllAccounts())
+            int page = 1;
+            if (args.Length > 1) int.TryParse(args[1], out page);
+            if (page < 1) page = 1;
+
+            var allAccounts = System.Linq.Enumerable.ToList(AccountDatabase.GetAllAccounts());
+            int totalAccounts = allAccounts.Count;
+            int perPage = 10;
+            int totalPages = (int)System.Math.Ceiling(totalAccounts / (double)perPage);
+
+            if (page > totalPages && totalPages > 0) page = totalPages;
+
+            caller.Reply($"====== All Accounts (Page {page}/{totalPages}) ======", Color.Gold);
+
+            int start = (page - 1) * perPage;
+            int end = System.Math.Min(start + perPage, totalAccounts);
+
+            for (int i = start; i < end; i++)
             {
+                var acc = allAccounts[i];
                 string st  = acc.IsBanned ? "[BANNED]" : "[Active]";
                 string adm = acc.IsAdmin  ? " [ADMIN]" : "";
                 caller.Reply($"  {acc.Username}{adm} | HP:{acc.StatLife}/{acc.StatLifeMax} | {st} | {acc.LastLogin:yyyy-MM-dd}", Color.White);
+            }
+
+            if (page < totalPages)
+            {
+                caller.Reply($"Type '/sg accounts {page + 1}' for next page.", Color.Yellow);
             }
         }
 
@@ -414,6 +474,39 @@ namespace ServerGuardMod.Common.Commands
             caller.Reply($"  Logins: {acc.LoginCount}", Color.White);
             caller.Reply($"  Last login: {acc.LastLogin}", Color.White);
             caller.Reply($"  Last IP: {acc.LastIP}", Color.White);
+        }
+
+        // ================================================================
+        // SHOW ME (Inspect UI)
+        // ================================================================
+        private void CmdShowMe(CommandCaller caller, string[] args)
+        {
+            if (Main.netMode == NetmodeID.Server)
+            {
+                caller.Reply("This command opens a UI, it can only be used in-game.", Color.Red);
+                return;
+            }
+
+            if (args.Length < 2) { caller.Reply("Usage: /sg showme <name>", Color.Red); return; }
+            
+            var target = FindPlayer(args[1]);
+            if (target == null) 
+            { 
+                caller.Reply("Player not found online.", Color.Red); 
+                return; 
+            }
+
+            // Toggle the Inspect UI for this target
+            if (InspectUI.InspectTarget == target)
+            {
+                InspectUI.InspectTarget = null;
+                caller.Reply("Closed inspect UI.", Color.Yellow);
+            }
+            else
+            {
+                InspectUI.InspectTarget = target;
+                caller.Reply($"Inspecting {target.name}'s inventory...", Color.Green);
+            }
         }
 
         // ================================================================

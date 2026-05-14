@@ -18,6 +18,7 @@ namespace ServerGuardMod.Common.Players
         public string Username       { get; set; } = "";
         public bool   IsAdmin        { get; set; } = false;
         public bool   IsFrozen       { get; set; } = false;
+        public bool   IsGodMode      { get; set; } = false; // Added true GodMode
 
         // ----------------------------------------------------------------
         // Server-side reference values for anti-cheat
@@ -30,12 +31,16 @@ namespace ServerGuardMod.Common.Players
         // Whether server has already snapshotted this player for the first time
         public bool SnapshotReady    { get; set; } = false;
 
+        private long  _lastInventoryValue = 0;
+        private int[] _lastStacks         = new int[59];
+        private bool  _itemNearLastTick   = false;
+        
         private int   _antiCheatTick = 0;
         private float _lastSafeX     = 0f;
         private float _lastSafeY     = 0f;
         private int   _noClipCount   = 0;
         private int   _autoSaveTick  = 0;
-        private const int CHECK_INTERVAL = 20; // every 20 ticks (~3x/sec)
+        private const int CHECK_INTERVAL = 60; // every 60 ticks (1 sec) for heavy checks
 
         // ----------------------------------------------------------------
         // When ANY player enters the world (runs on BOTH server and client)
@@ -66,6 +71,67 @@ namespace ServerGuardMod.Common.Players
                 // In single player there is no server; bypass login
                 IsLoggedIn = true;
                 Username   = Player.name;
+            }
+            else if (Main.netMode == NetmodeID.MultiplayerClient)
+            {
+                // Reset client state when entering a multiplayer world
+                ClientLoginSystem.Reset();
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // Block Damage if GodMode, Frozen, or Not Logged In
+        // ----------------------------------------------------------------
+        public override bool FreeDodge(Player.HurtInfo info)
+        {
+            // Note: Main.netMode check is removed so this works on client too!
+            if (IsGodMode || IsFrozen || !IsLoggedIn)
+            {
+                return true; // Dodge all damage completely
+            }
+            return base.FreeDodge(info);
+        }
+
+        public override bool CanBeHitByNPC(NPC npc, ref int cooldownSlot) => IsLoggedIn && !IsFrozen;
+        public override bool CanBeHitByProjectile(Projectile proj) => IsLoggedIn && !IsFrozen;
+        public override void ModifyHitByNPC(NPC npc, ref Player.HurtModifiers modifiers) 
+        {
+            if (!IsLoggedIn || IsFrozen || IsGodMode) modifiers.SetMaxDamage(0); // Extra safety
+        }
+
+        // ----------------------------------------------------------------
+        // Prevent Using Items completely when frozen/not logged in
+        // ----------------------------------------------------------------
+        public override bool CanUseItem(Item item)
+        {
+            if (IsFrozen || !IsLoggedIn) return false;
+            return base.CanUseItem(item);
+        }
+
+        // ----------------------------------------------------------------
+        // Stop all movement completely
+        // ----------------------------------------------------------------
+        public override void SetControls()
+        {
+            if (IsFrozen || !IsLoggedIn)
+            {
+                Player.controlLeft  = false;
+                Player.controlRight = false;
+                Player.controlUp    = false;
+                Player.controlDown  = false;
+                Player.controlJump  = false;
+                Player.controlDownHold = false;
+                
+                // Allow controlInv so they can open ESC menu to exit
+                // Player.controlInv   = false;   
+                
+                Player.controlHook  = false;   // Prevent grappling
+                Player.controlMount = false;
+                Player.controlThrow = false;
+                Player.controlUseItem = false;
+                Player.controlUseTile = false;
+                Player.controlQuickHeal = false;
+                Player.controlQuickMana = false;
             }
         }
 
@@ -106,7 +172,20 @@ namespace ServerGuardMod.Common.Players
         // ----------------------------------------------------------------
         public override void PostUpdate()
         {
-            if (Main.netMode == NetmodeID.Server && IsLoggedIn)
+            // Track if any items are near the player for heuristic anti-cheat
+            _itemNearLastTick = false;
+            if (Main.netMode != NetmodeID.Server) 
+            {
+                for(int i = 0; i < Main.maxItems; i++) {
+                    if (Main.item[i].active && Player.DistanceSQ(Main.item[i].Center) < 40000) { // ~200 pixels
+                        _itemNearLastTick = true;
+                        break;
+                    }
+                }
+            }
+
+            if (Main.netMode != NetmodeID.Server) return;
+            if (!IsLoggedIn) return;
             {
                 _autoSaveTick++;
                 if (_autoSaveTick >= 1800) // 30 seconds
@@ -139,16 +218,14 @@ namespace ServerGuardMod.Common.Players
             Player.immuneNoBlink  = true;
             Player.noBuilding     = true;
 
+            // Make them invisible (ghost-like)
+            Player.invis          = true;
+
+            // Add frozen buff just to be extra safe visually
+            Player.AddBuff(BuffID.Frozen, 2);
+
             // Keep HP full so they don't die while waiting
             Player.statLife       = Player.statLifeMax;
-
-            // Wipe inventory so nothing smuggled in is kept
-            for (int i = 0; i < Player.inventory.Length; i++)
-                Player.inventory[i] = new Item();
-
-            // Wipe armor and accessories slots too
-            for (int i = 0; i < Player.armor.Length; i++)
-                Player.armor[i] = new Item();
         }
 
         // ================================================================
@@ -169,7 +246,7 @@ namespace ServerGuardMod.Common.Players
             CheckMaxHpHack();
             CheckNoClip();
             CheckSpeedHack();
-            CheckInventoryHack();
+            CheckMemoryEditing();
         }
 
         private void TakeSnapshot()
@@ -180,6 +257,24 @@ namespace ServerGuardMod.Common.Players
             ServerSideManaMax = Player.statManaMax;
             _lastSafeX        = Player.position.X;
             _lastSafeY        = Player.position.Y;
+            _lastInventoryValue = GetInventoryValue();
+            
+            for (int i = 0; i < 59; i++)
+            {
+                _lastStacks[i] = Player.inventory[i].stack;
+            }
+        }
+
+        private long GetInventoryValue()
+        {
+            long value = 0;
+            for (int i = 0; i < 59; i++)
+            {
+                var item = Player.inventory[i];
+                if (item.type > 0)
+                    value += (long)item.value * item.stack;
+            }
+            return value;
         }
 
         // ----------------------------------------------------------------
@@ -281,34 +376,42 @@ namespace ServerGuardMod.Common.Players
         }
 
         // ----------------------------------------------------------------
-        // Inventory injection: item not recorded on server
+        // Heuristic Anti-Cheat (Cheat Engine / Memory Editing)
         // ----------------------------------------------------------------
-        private void CheckInventoryHack()
+        private void CheckMemoryEditing()
         {
-            var account = AccountDatabase.GetAccount(Username);
-            if (account == null) return;
+            long currentValue = GetInventoryValue();
+            long diff = currentValue - _lastInventoryValue;
 
+            bool isInteracting = (Player.chest != -1 || Player.talkNPC != -1);
+
+            // Check 1: Value Jump (if value jumped by 1 Gold Coin = 1_000_000 copper)
+            if (diff > 1_000_000 && !isInteracting && !_itemNearLastTick)
+            {
+                Flag("MEMORY_HACK_VALUE", $"Inventory value jumped by {diff} copper without shop/pickup! Possible Cheat Engine.");
+                NetMessage.SendData(MessageID.Kick, Player.whoAmI, -1,
+                    Terraria.Localization.NetworkText.FromLiteral("Cheat Detected: Memory Editing (Value Jump)"));
+            }
+
+            // Check 2: Stack Jump (for low value items like 5 dirt -> 55 dirt)
             for (int i = 0; i < 59; i++)
             {
-                var cur        = Player.inventory[i];
-                int savedID    = account.InventoryIDs[i];
-                int savedStack = account.InventoryStacks[i];
-
-                // Completely foreign item (server has no record of it)
-                if (cur.type != 0 && cur.type != savedID && savedID == 0)
+                int currentStack = Player.inventory[i].stack;
+                int stackDiff = currentStack - _lastStacks[i];
+                
+                // If a single stack jumped by more than 5, and it wasn't looted from chest or ground
+                if (stackDiff > 5 && !isInteracting && !_itemNearLastTick)
                 {
-                    Player.inventory[i] = new Item();
-                    Flag("ITEM_INJECT", $"Slot {i}: unknown item ID {cur.type} removed");
-                    continue;
+                    Flag("MEMORY_HACK_STACK", $"Slot {i} stack jumped from {_lastStacks[i]} to {currentStack} without shop/pickup!");
+                    NetMessage.SendData(MessageID.Kick, Player.whoAmI, -1,
+                        Terraria.Localization.NetworkText.FromLiteral("Cheat Detected: Memory Editing (Stack Injection)"));
+                    break;
                 }
-
-                // Stack grew impossibly fast
-                if (cur.type == savedID && savedID != 0 && cur.stack > savedStack + 10)
-                {
-                    Player.inventory[i].stack = savedStack;
-                    Flag("STACK_HACK", $"Slot {i}: stack {savedStack}->{cur.stack}");
-                }
+                _lastStacks[i] = currentStack;
             }
+
+            // Always update to current so legitimate jumps become the new baseline
+            _lastInventoryValue = currentValue;
         }
 
         // ================================================================

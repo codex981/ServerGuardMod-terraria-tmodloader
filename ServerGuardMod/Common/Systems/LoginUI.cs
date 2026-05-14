@@ -142,6 +142,8 @@ namespace ServerGuardMod.Common.Systems
                 cx - size.X / 2f, y, color, Color.Black, Vector2.Zero, scale);
         }
 
+        private int _backspaceTimer = 0;
+
         private void HandleInput(int ux, int uy, int uw, int uh,
                                   int px, int py, int pw, int ph)
         {
@@ -169,12 +171,16 @@ namespace ServerGuardMod.Common.Systems
                     ClientLoginSystem.InputPassword += c;
             }
 
-            if (Main.inputText.IsKeyDown(Keys.Back))
+            if (_backspaceTimer > 0) _backspaceTimer--;
+
+            if (Main.inputText.IsKeyDown(Keys.Back) && _backspaceTimer == 0)
             {
                 if (_activeField == ActiveField.Username && ClientLoginSystem.InputUsername.Length > 0)
                     ClientLoginSystem.InputUsername = ClientLoginSystem.InputUsername[..^1];
                 else if (_activeField == ActiveField.Password && ClientLoginSystem.InputPassword.Length > 0)
                     ClientLoginSystem.InputPassword = ClientLoginSystem.InputPassword[..^1];
+                
+                _backspaceTimer = 5; // Wait 5 frames before deleting another character
             }
 
             if (Main.inputText.IsKeyDown(Keys.Enter))

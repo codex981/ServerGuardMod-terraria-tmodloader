@@ -113,10 +113,10 @@ namespace ServerGuardMod.Common.Systems
             {
                 Username      = username,
                 PasswordHash  = HashPassword(password),
-                StatLife      = 100,
-                StatLifeMax   = 100,
-                StatMana      = 20,
-                StatManaMax   = 20,
+                StatLife      = player.statLifeMax,
+                StatLifeMax   = player.statLifeMax,
+                StatMana      = player.statManaMax,
+                StatManaMax   = player.statManaMax,
                 PosX          = player.position.X,
                 PosY          = player.position.Y,
                 LoginCount    = 1,
@@ -125,9 +125,9 @@ namespace ServerGuardMod.Common.Systems
 
             for (int i = 0; i < 59; i++)
             {
-                data.InventoryIDs[i]    = 0;
-                data.InventoryStacks[i] = 0;
-                data.InventoryPrefix[i] = 0;
+                data.InventoryIDs[i]    = player.inventory[i].type;
+                data.InventoryStacks[i] = player.inventory[i].stack;
+                data.InventoryPrefix[i] = player.inventory[i].prefix;
             }
 
             _accounts[key] = data;
@@ -141,17 +141,32 @@ namespace ServerGuardMod.Common.Systems
             player.statMana    = data.StatMana;
             player.statManaMax = data.StatManaMax;
 
-            for (int i = 0; i < player.inventory.Length; i++)
-                player.inventory[i] = new Item();
-
+            // Check if DB inventory is entirely empty (first time login)
+            bool isDbEmpty = true;
             for (int i = 0; i < 59 && i < data.InventoryIDs.Length; i++)
             {
                 if (data.InventoryIDs[i] != 0)
                 {
+                    isDbEmpty = false;
+                    break;
+                }
+            }
+
+            // If it's not a brand new empty inventory, load it
+            if (!isDbEmpty)
+            {
+                for (int i = 0; i < player.inventory.Length; i++)
                     player.inventory[i] = new Item();
-                    player.inventory[i].SetDefaults(data.InventoryIDs[i]);
-                    player.inventory[i].stack  = data.InventoryStacks[i];
-                    player.inventory[i].prefix = (byte)data.InventoryPrefix[i];
+
+                for (int i = 0; i < 59 && i < data.InventoryIDs.Length; i++)
+                {
+                    if (data.InventoryIDs[i] != 0)
+                    {
+                        player.inventory[i] = new Item();
+                        player.inventory[i].SetDefaults(data.InventoryIDs[i]);
+                        player.inventory[i].stack  = data.InventoryStacks[i];
+                        player.inventory[i].prefix = (byte)data.InventoryPrefix[i];
+                    }
                 }
             }
 

@@ -43,24 +43,6 @@ namespace ServerGuardMod.Common.AntiCheat
                 return;
             }
 
-            // --- HP sudden jump ---
-            int hpGain = current.Life - previous.Life;
-            if (hpGain > 50 && !player.potionDelay.Equals(0))
-            {
-                player.statLife = sgPlayer.ServerSideHP;
-                TriggerViolation(player, sgPlayer, "HP_CHEAT",
-                    $"HP jumped {previous.Life} -> {current.Life} (+{hpGain})");
-            }
-
-            // --- Mana sudden jump ---
-            int manaGain = current.Mana - previous.Mana;
-            if (manaGain > 200)
-            {
-                player.statMana = sgPlayer.ServerSideMana;
-                TriggerViolation(player, sgPlayer, "MANA_CHEAT",
-                    $"Mana jumped {previous.Mana} -> {current.Mana} (+{manaGain})");
-            }
-
             // --- Buff overflow ---
             if (current.BuffCount > 22)
             {

@@ -20,6 +20,17 @@ namespace ServerGuardMod.Common.Systems
         public static string InputPassword  { get; set; } = "";
         public static string StatusMessage  { get; set; } = "";
 
+        // Reset state when entering world
+        public static void Reset()
+        {
+            ShowingLogin    = false;
+            ShowingRegister = false;
+            IsLoggedIn      = false;
+            InputUsername   = "";
+            InputPassword   = "";
+            StatusMessage   = "";
+        }
+
         // ----------------------------------------------------------------
         // Called when server sends LoginRequired packet
         // ----------------------------------------------------------------
@@ -91,18 +102,32 @@ namespace ServerGuardMod.Common.Systems
             player.statMana    = data.StatMana;
             player.statManaMax = data.StatManaMax;
 
-            // Apply inventory from server
-            for (int i = 0; i < player.inventory.Length; i++)
-                player.inventory[i] = new Item();
-
+            // Check if server inventory is entirely empty (first time login)
+            bool isDbEmpty = true;
             for (int i = 0; i < 59 && i < data.InventoryIDs.Length; i++)
             {
                 if (data.InventoryIDs[i] != 0)
                 {
+                    isDbEmpty = false;
+                    break;
+                }
+            }
+
+            // Apply inventory from server only if it's not a brand new empty DB
+            if (!isDbEmpty)
+            {
+                for (int i = 0; i < player.inventory.Length; i++)
                     player.inventory[i] = new Item();
-                    player.inventory[i].SetDefaults(data.InventoryIDs[i]);
-                    player.inventory[i].stack  = data.InventoryStacks[i];
-                    player.inventory[i].prefix = (byte)data.InventoryPrefix[i];
+
+                for (int i = 0; i < 59 && i < data.InventoryIDs.Length; i++)
+                {
+                    if (data.InventoryIDs[i] != 0)
+                    {
+                        player.inventory[i] = new Item();
+                        player.inventory[i].SetDefaults(data.InventoryIDs[i]);
+                        player.inventory[i].stack  = data.InventoryStacks[i];
+                        player.inventory[i].prefix = (byte)data.InventoryPrefix[i];
+                    }
                 }
             }
 
