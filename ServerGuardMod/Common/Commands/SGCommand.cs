@@ -91,7 +91,6 @@ namespace ServerGuardMod.Common.Commands
                 case "inv":
                 case "showme":     CmdShowMe(caller, args);     break;
                 case "broadcast":  CmdBroadcast(caller, args);  break;
-                case "info":       CmdPlayerInfo(caller, args); break;
                 case "save":
                     AccountDatabase.Save();
                     caller.Reply("All data saved.", Color.Green);
@@ -197,7 +196,6 @@ namespace ServerGuardMod.Common.Commands
             caller.Reply("/sg accounts [page]", Color.White);
             caller.Reply("/sg inv <name>                    - Inspect inventory UI", Color.White);
             caller.Reply("/sg broadcast <message>", Color.White);
-            caller.Reply("/sg info <name>", Color.White);
             caller.Reply("/sg logpath                       - Show log folder path", Color.White);
             caller.Reply("/sg save  |  /sg reload", Color.White);
             caller.Reply("=================================", Color.Gold);
@@ -458,24 +456,6 @@ namespace ServerGuardMod.Common.Commands
         }
 
         // ================================================================
-        // PLAYER INFO
-        // ================================================================
-        private void CmdPlayerInfo(CommandCaller caller, string[] args)
-        {
-            if (args.Length < 2) { caller.Reply("Usage: /sg info <name>", Color.Red); return; }
-            var acc = AccountDatabase.GetAccount(args[1]);
-            if (acc == null) { caller.Reply("Account not found", Color.Red); return; }
-
-            caller.Reply($"====== {acc.Username} ======", Color.Gold);
-            caller.Reply($"  HP: {acc.StatLife}/{acc.StatLifeMax}", Color.White);
-            caller.Reply($"  Mana: {acc.StatMana}/{acc.StatManaMax}", Color.White);
-            caller.Reply($"  Admin: {acc.IsAdmin}", Color.White);
-            caller.Reply($"  Banned: {acc.IsBanned}  {acc.BanReason}", Color.White);
-            caller.Reply($"  Logins: {acc.LoginCount}", Color.White);
-            caller.Reply($"  Last login: {acc.LastLogin}", Color.White);
-            caller.Reply($"  Last IP: {acc.LastIP}", Color.White);
-        }
-
         // ================================================================
         // SHOW ME (Inspect UI)
         // ================================================================

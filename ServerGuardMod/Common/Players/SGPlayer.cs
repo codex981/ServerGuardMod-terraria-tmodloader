@@ -32,8 +32,8 @@ namespace ServerGuardMod.Common.Players
         public bool SnapshotReady    { get; set; } = false;
 
         private long  _lastInventoryValue = 0;
-        private int[] _lastStacks         = new int[59];
         private bool  _itemNearLastTick   = false;
+        private Vector2 _frozenPos;
         
         private int   _antiCheatTick = 0;
         private float _lastSafeX     = 0f;
@@ -47,6 +47,16 @@ namespace ServerGuardMod.Common.Players
         // ----------------------------------------------------------------
         public override void OnEnterWorld()
         {
+            _frozenPos = Player.position;
+
+            // --- CLIENT SIDE ---
+            if (Main.netMode != NetmodeID.Server)
+            {
+                Main.NewText("Welcome! Please wait while ServerGuard synchronizes your data...", Color.Yellow);
+                Main.NewText("[WARNING] This server uses Server-Side Characters (SSC).", Color.Red);
+                Main.NewText("Please create a NEW empty character for this server to avoid losing your local items!", Color.Red);
+            }
+
             // --- SERVER SIDE ---
             if (Main.netMode == NetmodeID.Server)
             {
@@ -140,12 +150,16 @@ namespace ServerGuardMod.Common.Players
         // ----------------------------------------------------------------
         public override void PreUpdate()
         {
-            // ---- FREEZE (admin command) ----
-            if (IsFrozen)
+            // Absolute Freeze: Lock position and velocity to stop SpeedHacks & Calamity
+            if (IsFrozen || (Main.netMode == NetmodeID.Server && !IsLoggedIn))
             {
-                Player.velocity      = Vector2.Zero;
-                Player.immune        = true;
-                Player.immuneNoBlink = true;
+                Player.position = _frozenPos;
+                Player.velocity = Vector2.Zero;
+            }
+            else if (IsLoggedIn)
+            {
+                // Update frozen pos to current safe pos when playing normally
+                _frozenPos = Player.position;
             }
 
             // ---- BLOCK BEFORE LOGIN (server only) ----
@@ -217,6 +231,7 @@ namespace ServerGuardMod.Common.Players
             Player.immune         = true;
             Player.immuneNoBlink  = true;
             Player.noBuilding     = true;
+            Player.aggro          = -999999; // Make monsters completely ignore them
 
             // Make them invisible (ghost-like)
             Player.invis          = true;
@@ -258,11 +273,6 @@ namespace ServerGuardMod.Common.Players
             _lastSafeX        = Player.position.X;
             _lastSafeY        = Player.position.Y;
             _lastInventoryValue = GetInventoryValue();
-            
-            for (int i = 0; i < 59; i++)
-            {
-                _lastStacks[i] = Player.inventory[i].stack;
-            }
         }
 
         private long GetInventoryValue()
@@ -385,29 +395,22 @@ namespace ServerGuardMod.Common.Players
 
             bool isInteracting = (Player.chest != -1 || Player.talkNPC != -1);
 
-            // Check 1: Value Jump (if value jumped by 1 Gold Coin = 1_000_000 copper)
-            if (diff > 1_000_000 && !isInteracting && !_itemNearLastTick)
+            // Check 1: Value Jump (if value jumped by 50 Gold Coin = 5_000_000 copper)
+            // (Lowered from extreme, but disabled stack injection to allow moving items freely)
+            if (diff > 5_000_000 && !isInteracting && !_itemNearLastTick)
             {
-                Flag("MEMORY_HACK_VALUE", $"Inventory value jumped by {diff} copper without shop/pickup! Possible Cheat Engine.");
-                NetMessage.SendData(MessageID.Kick, Player.whoAmI, -1,
-                    Terraria.Localization.NetworkText.FromLiteral("Cheat Detected: Memory Editing (Value Jump)"));
-            }
-
-            // Check 2: Stack Jump (for low value items like 5 dirt -> 55 dirt)
-            for (int i = 0; i < 59; i++)
-            {
-                int currentStack = Player.inventory[i].stack;
-                int stackDiff = currentStack - _lastStacks[i];
+                Flag("MEMORY_HACK_VALUE", $"Inventory value jumped by {diff} copper without shop/pickup! Reverting data.");
                 
-                // If a single stack jumped by more than 5, and it wasn't looted from chest or ground
-                if (stackDiff > 5 && !isInteracting && !_itemNearLastTick)
+                // Revert player data instead of just kicking!
+                var account = AccountDatabase.GetAccount(Username);
+                if (account != null)
                 {
-                    Flag("MEMORY_HACK_STACK", $"Slot {i} stack jumped from {_lastStacks[i]} to {currentStack} without shop/pickup!");
-                    NetMessage.SendData(MessageID.Kick, Player.whoAmI, -1,
-                        Terraria.Localization.NetworkText.FromLiteral("Cheat Detected: Memory Editing (Stack Injection)"));
-                    break;
+                    AccountDatabase.ApplyDataToPlayer(Player, account); // Restore truth
                 }
-                _lastStacks[i] = currentStack;
+
+                NetMessage.SendData(MessageID.ChatText, Player.whoAmI, -1,
+                    Terraria.Localization.NetworkText.FromLiteral("Cheat Detected: Your inventory has been restored to the server's version!"),
+                    255, 255, 0, 0); // Red Warning Message
             }
 
             // Always update to current so legitimate jumps become the new baseline

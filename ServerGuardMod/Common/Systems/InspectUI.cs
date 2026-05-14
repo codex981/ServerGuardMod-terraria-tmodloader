@@ -43,8 +43,8 @@ namespace ServerGuardMod.Common.Systems
             int screenWidth = Main.screenWidth;
             int screenHeight = Main.screenHeight;
 
-            int panelWidth = 520;
-            int panelHeight = 350;
+            int panelWidth = 850;
+            int panelHeight = 400;
             int panelX = (screenWidth - panelWidth) / 2;
             int panelY = (screenHeight - panelHeight) / 2;
 
@@ -52,11 +52,14 @@ namespace ServerGuardMod.Common.Systems
             spriteBatch.Draw(TextureAssets.MagicPixel.Value, new Rectangle(panelX, panelY, panelWidth, panelHeight), new Color(20, 20, 40, 240));
             DrawBorder(spriteBatch, panelX, panelY, panelWidth, panelHeight, Color.Cyan);
 
-            // Draw Title
+            // Draw Title & Stats
             string title = $"Inspecting: {InspectTarget.name}";
             var font = FontAssets.MouseText.Value;
             Vector2 titleSize = font.MeasureString(title);
             Utils.DrawBorderString(spriteBatch, title, new Vector2(panelX + panelWidth / 2f - titleSize.X / 2f, panelY + 10), Color.Yellow);
+
+            string stats = $"HP: {InspectTarget.statLife}/{InspectTarget.statLifeMax2}  |  Mana: {InspectTarget.statMana}/{InspectTarget.statManaMax2}";
+            Utils.DrawBorderString(spriteBatch, stats, new Vector2(panelX + 20, panelY + 15), Color.Red);
 
             // Draw Close Button (Top Right)
             string closeText = "[X]";
@@ -74,13 +77,14 @@ namespace ServerGuardMod.Common.Systems
             }
             Utils.DrawBorderString(spriteBatch, closeText, closePos, closeColor);
 
-            // Draw Inventory Slots (50 main slots + 4 coins + 4 ammo = 58 slots)
+            // ----------------------------------------------------
+            // Main Inventory (10 cols x 5 rows)
+            // ----------------------------------------------------
             int startX = panelX + 20;
             int startY = panelY + 50;
-            int slotSize = 48; // Standard Terraria slot size approx
+            int slotSize = 46;
             int padding = 4;
 
-            // Main Inventory (10 cols x 5 rows)
             for (int row = 0; row < 5; row++)
             {
                 for (int col = 0; col < 10; col++)
@@ -90,21 +94,54 @@ namespace ServerGuardMod.Common.Systems
                 }
             }
 
+            // ----------------------------------------------------
             // Coins & Ammo (Cols 10 and 11)
+            // ----------------------------------------------------
             int extraX = startX + 10 * (slotSize + padding) + 10;
             Utils.DrawBorderString(spriteBatch, "Coins", new Vector2(extraX, startY - 20), Color.Gold, 0.8f);
-            for (int i = 0; i < 4; i++)
-            {
-                DrawItemSlot(spriteBatch, InspectTarget.inventory[50 + i], extraX, startY + i * (slotSize + padding));
-            }
+            for (int i = 0; i < 4; i++) DrawItemSlot(spriteBatch, InspectTarget.inventory[50 + i], extraX, startY + i * (slotSize + padding));
 
             int ammoX = extraX + slotSize + padding;
             Utils.DrawBorderString(spriteBatch, "Ammo", new Vector2(ammoX, startY - 20), Color.LightGray, 0.8f);
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 4; i++) DrawItemSlot(spriteBatch, InspectTarget.inventory[54 + i], ammoX, startY + i * (slotSize + padding));
+
+            // ----------------------------------------------------
+            // Armor & Accessories (10 slots) - Col 12
+            // ----------------------------------------------------
+            int armorX = ammoX + slotSize + padding + 15;
+            Utils.DrawBorderString(spriteBatch, "Equips", new Vector2(armorX, startY - 20), Color.LightCyan, 0.8f);
+            for (int i = 0; i < 10; i++)
             {
-                DrawItemSlot(spriteBatch, InspectTarget.inventory[54 + i], ammoX, startY + i * (slotSize + padding));
+                // To fit 10 slots vertically, we need a smaller Y step or two columns. Let's do 2 columns: Armor and Vanity.
+                DrawItemSlot(spriteBatch, InspectTarget.armor[i], armorX, startY + i * 32); // Slightly overlapping to fit vertically
             }
-            
+
+            // Vanity (10 slots) - Col 13
+            int vanityX = armorX + 40;
+            for (int i = 0; i < 10; i++)
+            {
+                DrawItemSlot(spriteBatch, InspectTarget.armor[i + 10], vanityX, startY + i * 32);
+            }
+
+            // Dyes (10 slots) - Col 14
+            int dyeX = vanityX + 40;
+            Utils.DrawBorderString(spriteBatch, "Dyes", new Vector2(dyeX, startY - 20), Color.Violet, 0.8f);
+            for (int i = 0; i < 10; i++)
+            {
+                DrawItemSlot(spriteBatch, InspectTarget.dye[i], dyeX, startY + i * 32);
+            }
+
+            // ----------------------------------------------------
+            // Misc Equips (5 slots) - Col 15
+            // (Pet, Light Pet, Minecart, Mount, Hook)
+            // ----------------------------------------------------
+            int miscX = dyeX + slotSize + padding + 15;
+            Utils.DrawBorderString(spriteBatch, "Misc", new Vector2(miscX, startY - 20), Color.Orange, 0.8f);
+            for (int i = 0; i < 5; i++)
+            {
+                DrawItemSlot(spriteBatch, InspectTarget.miscEquips[i], miscX, startY + i * (slotSize + padding));
+            }
+
             // Total Value Info
             long totalValue = 0;
             for(int i = 0; i < 58; i++) {
@@ -117,7 +154,7 @@ namespace ServerGuardMod.Common.Systems
             int s = (int)((totalValue % 10000) / 100);
             int c = (int)(totalValue % 100);
             
-            string valStr = $"Total Est. Value: {p}P {g}G {s}S {c}C";
+            string valStr = $"Total Est. Value (Inventory): {p}P {g}G {s}S {c}C";
             Utils.DrawBorderString(spriteBatch, valStr, new Vector2(panelX + 20, panelY + panelHeight - 30), Color.Lime);
         }
 
