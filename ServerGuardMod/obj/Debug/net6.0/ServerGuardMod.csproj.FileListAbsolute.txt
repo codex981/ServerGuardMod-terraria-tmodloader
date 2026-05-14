@@ -1,0 +1,5 @@
+C:\Users\ayham\OneDrive\Documents\my games\Terraria\tModLoader\ModSources\ServerGuardMod\obj\Debug\net6.0\ServerGuardMod.csproj.AssemblyReference.cache
+C:\Users\ayham\OneDrive\Documents\my games\Terraria\tModLoader\ModSources\ServerGuardMod\obj\Debug\net6.0\ServerGuardMod.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\ayham\OneDrive\Documents\my games\Terraria\tModLoader\ModSources\ServerGuardMod\obj\Debug\net6.0\ServerGuardMod.AssemblyInfoInputs.cache
+C:\Users\ayham\OneDrive\Documents\my games\Terraria\tModLoader\ModSources\ServerGuardMod\obj\Debug\net6.0\ServerGuardMod.AssemblyInfo.cs
+C:\Users\ayham\OneDrive\Documents\my games\Terraria\tModLoader\ModSources\ServerGuardMod\obj\Debug\net6.0\ServerGuardMod.csproj.CoreCompileInputs.cache

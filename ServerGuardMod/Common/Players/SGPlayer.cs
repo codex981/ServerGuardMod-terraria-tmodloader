@@ -33,6 +33,12 @@ namespace ServerGuardMod.Common.Players
 
         private long  _lastInventoryValue = 0;
         private bool  _itemNearLastTick   = false;
+        private bool  _serverJoinInitialized = false;
+        private bool  _trustedInventoryReady = false;
+        private int   _loginPromptTick = 0;
+        private readonly int[] _trustedTypes    = new int[59];
+        private readonly int[] _trustedStacks   = new int[59];
+        private readonly int[] _trustedPrefixes = new int[59];
         private Vector2 _frozenPos;
         
         private int   _antiCheatTick = 0;
@@ -41,6 +47,9 @@ namespace ServerGuardMod.Common.Players
         private int   _noClipCount   = 0;
         private int   _autoSaveTick  = 0;
         private const int CHECK_INTERVAL = 60; // every 60 ticks (1 sec) for heavy checks
+        private const int STACK_JUMP_TOLERANCE = 5;
+        private const long VALUE_JUMP_TOLERANCE = 5_000_000; // 50 gold
+        private const long CRAFTING_VALUE_TOLERANCE = 500_000; // 5 gold wiggle room for recipes/mods
 
         // ----------------------------------------------------------------
         // When ANY player enters the world (runs on BOTH server and client)
@@ -62,13 +71,14 @@ namespace ServerGuardMod.Common.Players
             {
                 IsLoggedIn    = false;
                 SnapshotReady = false;
+                _serverJoinInitialized = true;
+                _trustedInventoryReady = false;
 
                 // Hard-block the player immediately
                 BlockPlayer();
 
                 // Tell the client to show the login UI
-                var pkt = ServerGuardMod.CreatePacket(PacketType.LoginRequired);
-                pkt.Send(Player.whoAmI);
+                SendLoginRequired();
 
                 ServerGuardMod.Instance.Logger.Info(
                     $"[SGPlayer] {Player.name} connected - awaiting login"
@@ -150,6 +160,9 @@ namespace ServerGuardMod.Common.Players
         // ----------------------------------------------------------------
         public override void PreUpdate()
         {
+            if (Main.netMode == NetmodeID.Server)
+                InitializeServerSessionIfNeeded();
+
             // Absolute Freeze: Lock position and velocity to stop SpeedHacks & Calamity
             if (IsFrozen || (Main.netMode == NetmodeID.Server && !IsLoggedIn))
             {
@@ -166,6 +179,12 @@ namespace ServerGuardMod.Common.Players
             if (Main.netMode == NetmodeID.Server && !IsLoggedIn)
             {
                 BlockPlayer();
+                _loginPromptTick++;
+                if (_loginPromptTick >= 600)
+                {
+                    _loginPromptTick = 0;
+                    SendLoginRequired();
+                }
                 return;
             }
 
@@ -188,7 +207,7 @@ namespace ServerGuardMod.Common.Players
         {
             // Track if any items are near the player for heuristic anti-cheat
             _itemNearLastTick = false;
-            if (Main.netMode != NetmodeID.Server) 
+            if (Main.netMode != NetmodeID.SinglePlayer) 
             {
                 for(int i = 0; i < Main.maxItems; i++) {
                     if (Main.item[i].active && Player.DistanceSQ(Main.item[i].Center) < 40000) { // ~200 pixels
@@ -220,6 +239,36 @@ namespace ServerGuardMod.Common.Players
                 AccountDatabase.SavePlayerData(Player, Username);
                 ServerGuardMod.Instance.Logger.Info($"[Save] Saved data for {Username}");
             }
+        }
+
+        private void InitializeServerSessionIfNeeded()
+        {
+            if (_serverJoinInitialized)
+                return;
+
+            _serverJoinInitialized = true;
+            _trustedInventoryReady = false;
+            IsLoggedIn = false;
+            IsFrozen = false;
+            IsGodMode = false;
+            Username = "";
+            IsAdmin = false;
+            SnapshotReady = false;
+            _frozenPos = Player.position;
+            _loginPromptTick = 0;
+
+            BlockPlayer();
+            SendLoginRequired();
+
+            ServerGuardMod.Instance.Logger.Info(
+                $"[SGPlayer] {Player.name} connected - awaiting login"
+            );
+        }
+
+        private void SendLoginRequired()
+        {
+            var pkt = ServerGuardMod.CreatePacket(PacketType.LoginRequired);
+            pkt.Send(Player.whoAmI);
         }
 
         // ================================================================
@@ -273,6 +322,14 @@ namespace ServerGuardMod.Common.Players
             _lastSafeX        = Player.position.X;
             _lastSafeY        = Player.position.Y;
             _lastInventoryValue = GetInventoryValue();
+            CaptureTrustedInventory();
+        }
+
+        public void TrustCurrentServerState(string reason = "")
+        {
+            TakeSnapshot();
+            SnapshotReady = true;
+            AccountDatabase.UpdatePlayerDataInMemory(Player, Username);
         }
 
         private long GetInventoryValue()
@@ -281,10 +338,31 @@ namespace ServerGuardMod.Common.Players
             for (int i = 0; i < 59; i++)
             {
                 var item = Player.inventory[i];
-                if (item.type > 0)
+                if (item != null && item.type > ItemID.None)
                     value += (long)item.value * item.stack;
             }
             return value;
+        }
+
+        private void CaptureTrustedInventory()
+        {
+            for (int i = 0; i < 59; i++)
+            {
+                var item = Player.inventory[i];
+                if (item == null || item.type <= ItemID.None || item.stack <= 0)
+                {
+                    _trustedTypes[i] = 0;
+                    _trustedStacks[i] = 0;
+                    _trustedPrefixes[i] = 0;
+                    continue;
+                }
+
+                _trustedTypes[i] = item.type;
+                _trustedStacks[i] = item.stack;
+                _trustedPrefixes[i] = item.prefix;
+            }
+
+            _trustedInventoryReady = true;
         }
 
         // ----------------------------------------------------------------
@@ -390,31 +468,111 @@ namespace ServerGuardMod.Common.Players
         // ----------------------------------------------------------------
         private void CheckMemoryEditing()
         {
+            if (!_trustedInventoryReady)
+            {
+                CaptureTrustedInventory();
+                _lastInventoryValue = GetInventoryValue();
+                return;
+            }
+
             long currentValue = GetInventoryValue();
             long diff = currentValue - _lastInventoryValue;
 
             bool isInteracting = (Player.chest != -1 || Player.talkNPC != -1);
+            bool hasGameplayContext = isInteracting || _itemNearLastTick || Player.itemAnimation > 0 || Player.itemTime > 0;
 
-            // Check 1: Value Jump (if value jumped by 50 Gold Coin = 5_000_000 copper)
-            // (Lowered from extreme, but disabled stack injection to allow moving items freely)
-            if (diff > 5_000_000 && !isInteracting && !_itemNearLastTick)
+            long gainedValue = 0;
+            long lostValue = 0;
+            int largestStackJump = 0;
+            string largestStackDetails = "";
+
+            for (int i = 0; i < 59; i++)
             {
-                Flag("MEMORY_HACK_VALUE", $"Inventory value jumped by {diff} copper without shop/pickup! Reverting data.");
-                
-                // Revert player data instead of just kicking!
-                var account = AccountDatabase.GetAccount(Username);
-                if (account != null)
-                {
-                    AccountDatabase.ApplyDataToPlayer(Player, account); // Restore truth
-                }
+                var item = Player.inventory[i];
+                bool hasCurrentItem = item != null && item.type > ItemID.None && item.stack > 0;
+                int currentType = hasCurrentItem ? item!.type : ItemID.None;
+                int currentStack = hasCurrentItem ? item!.stack : 0;
+                int currentPrefix = hasCurrentItem ? item!.prefix : 0;
+                long currentSlotValue = hasCurrentItem ? (long)item!.value * currentStack : 0;
 
-                NetMessage.SendData(MessageID.ChatText, Player.whoAmI, -1,
-                    Terraria.Localization.NetworkText.FromLiteral("Cheat Detected: Your inventory has been restored to the server's version!"),
-                    255, 255, 0, 0); // Red Warning Message
+                int oldType = _trustedTypes[i];
+                int oldStack = _trustedStacks[i];
+                int oldPrefix = _trustedPrefixes[i];
+                long oldSlotValue = GetTrustedSlotValue(oldType, oldStack, oldPrefix);
+
+                if (oldType == currentType && oldPrefix == currentPrefix)
+                {
+                    int stackDiff = currentStack - oldStack;
+                    if (stackDiff > 0)
+                    {
+                        gainedValue += Math.Max(0, currentSlotValue - oldSlotValue);
+                        if (stackDiff > largestStackJump)
+                        {
+                            largestStackJump = stackDiff;
+                            largestStackDetails = $"slot {i}: type {currentType}, stack {oldStack} -> {currentStack}";
+                        }
+                    }
+                    else if (stackDiff < 0)
+                    {
+                        lostValue += Math.Max(0, oldSlotValue - currentSlotValue);
+                    }
+                }
+                else
+                {
+                    gainedValue += currentSlotValue;
+                    lostValue += oldSlotValue;
+                    if (currentType != ItemID.None && currentStack > largestStackJump)
+                    {
+                        largestStackJump = currentStack;
+                        largestStackDetails = $"slot {i}: type {oldType} -> {currentType}, stack {currentStack}";
+                    }
+                }
             }
 
-            // Always update to current so legitimate jumps become the new baseline
+            bool plausibleCraftingOrSwap = lostValue > 0 && gainedValue <= lostValue + CRAFTING_VALUE_TOLERANCE;
+            bool suspiciousValueJump = diff > VALUE_JUMP_TOLERANCE || gainedValue > lostValue + VALUE_JUMP_TOLERANCE;
+            bool suspiciousStackJump = largestStackJump > STACK_JUMP_TOLERANCE;
+
+            if (!hasGameplayContext && !plausibleCraftingOrSwap && (suspiciousValueJump || suspiciousStackJump))
+            {
+                string reason = suspiciousStackJump
+                    ? $"Stack jump without gameplay context ({largestStackDetails})"
+                    : $"Inventory value jumped by {diff} copper without gameplay context";
+
+                Flag("MEMORY_HACK_INVENTORY", reason);
+                RestoreServerTruth();
+                return;
+            }
+
+            AccountDatabase.UpdatePlayerDataInMemory(Player, Username);
+            CaptureTrustedInventory();
             _lastInventoryValue = currentValue;
+        }
+
+        private long GetTrustedSlotValue(int type, int stack, int prefix)
+        {
+            if (type <= ItemID.None || stack <= 0)
+                return 0;
+
+            var item = new Item();
+            item.SetDefaults(type);
+            item.prefix = (byte)Math.Clamp(prefix, byte.MinValue, byte.MaxValue);
+            return (long)item.value * stack;
+        }
+
+        private void RestoreServerTruth()
+        {
+            var account = AccountDatabase.GetAccount(Username);
+            if (account != null)
+            {
+                AccountDatabase.ApplyDataToPlayer(Player, account);
+                AccountDatabase.SendPlayerData(Player.whoAmI, account);
+                TrustCurrentServerState("restore");
+            }
+
+            NetMessage.SendData(MessageID.ChatText, Player.whoAmI, -1,
+                Terraria.Localization.NetworkText.FromLiteral("Cheat Detected: inventory restored to the server version."),
+                255, 255, 0, 0);
         }
 
         // ================================================================

@@ -95,41 +95,8 @@ namespace ServerGuardMod.Common.Systems
             ShowingRegister = false;
             IsLoggedIn      = true;
 
-            // Apply server-side stats to local player
             var player = Main.LocalPlayer;
-            player.statLife    = data.StatLife;
-            player.statLifeMax = data.StatLifeMax;
-            player.statMana    = data.StatMana;
-            player.statManaMax = data.StatManaMax;
-
-            // Check if server inventory is entirely empty (first time login)
-            bool isDbEmpty = true;
-            for (int i = 0; i < 59 && i < data.InventoryIDs.Length; i++)
-            {
-                if (data.InventoryIDs[i] != 0)
-                {
-                    isDbEmpty = false;
-                    break;
-                }
-            }
-
-            // Apply inventory from server only if it's not a brand new empty DB
-            if (!isDbEmpty)
-            {
-                for (int i = 0; i < player.inventory.Length; i++)
-                    player.inventory[i] = new Item();
-
-                for (int i = 0; i < 59 && i < data.InventoryIDs.Length; i++)
-                {
-                    if (data.InventoryIDs[i] != 0)
-                    {
-                        player.inventory[i] = new Item();
-                        player.inventory[i].SetDefaults(data.InventoryIDs[i]);
-                        player.inventory[i].stack  = data.InventoryStacks[i];
-                        player.inventory[i].prefix = (byte)data.InventoryPrefix[i];
-                    }
-                }
-            }
+            AccountDatabase.ApplyDataToPlayer(player, data);
 
             // Update SGPlayer state on the client side
             var sg       = player.GetModPlayer<SGPlayer>();
@@ -161,19 +128,7 @@ namespace ServerGuardMod.Common.Systems
             var data   = AccountDatabase.ReadPlayerData(reader);
             var player = Main.LocalPlayer;
 
-            player.statLife    = data.StatLife;
-            player.statLifeMax = data.StatLifeMax;
-
-            for (int i = 0; i < 59 && i < data.InventoryIDs.Length; i++)
-            {
-                if (data.InventoryIDs[i] != 0)
-                {
-                    player.inventory[i] = new Item();
-                    player.inventory[i].SetDefaults(data.InventoryIDs[i]);
-                    player.inventory[i].stack  = data.InventoryStacks[i];
-                    player.inventory[i].prefix = (byte)data.InventoryPrefix[i];
-                }
-            }
+            AccountDatabase.ApplyDataToPlayer(player, data);
         }
     }
 }

@@ -3,6 +3,7 @@ using Terraria;
 using Terraria.ModLoader;
 using Terraria.ID;
 using ServerGuardMod.Common.Players;
+using ServerGuardMod.Common.Network;
 
 namespace ServerGuardMod.Common.AntiCheat
 {
@@ -64,6 +65,37 @@ namespace ServerGuardMod.Common.AntiCheat
 
                 if (!allowed)
                     return false;
+            }
+
+            return true;
+        }
+
+        public static bool ValidateServerGuardPacket(int playerIndex, PacketType packetType)
+        {
+            if (Main.netMode != NetmodeID.Server) return true;
+            if (playerIndex < 0 || playerIndex >= Main.maxPlayers) return false;
+
+            var player = Main.player[playerIndex];
+            if (!player.active) return false;
+
+            _packetCount[playerIndex]++;
+            if (_packetCount[playerIndex] > MAX_PACKETS_PER_SECOND)
+            {
+                ServerGuardMod.Instance.Logger.Warn(
+                    $"[PacketFlood] {player.name} sending suspicious ServerGuard packet rate: {_packetCount[playerIndex]}/sec"
+                );
+                return false;
+            }
+
+            var sgPlayer = player.GetModPlayer<SGPlayer>();
+            if (!sgPlayer.IsLoggedIn &&
+                packetType != PacketType.RequestLogin &&
+                packetType != PacketType.RequestRegister)
+            {
+                ServerGuardMod.Instance.Logger.Warn(
+                    $"[PacketInjection] {player.name} sent {packetType} before login"
+                );
+                return false;
             }
 
             return true;

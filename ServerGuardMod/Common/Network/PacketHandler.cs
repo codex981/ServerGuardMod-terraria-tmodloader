@@ -5,6 +5,7 @@ using Terraria.ID;
 using Microsoft.Xna.Framework;
 using ServerGuardMod.Common.Systems;
 using ServerGuardMod.Common.Players;
+using ServerGuardMod.Common.AntiCheat;
 
 namespace ServerGuardMod.Common.Network
 {
@@ -13,6 +14,9 @@ namespace ServerGuardMod.Common.Network
         public static void Handle(BinaryReader reader, int whoAmI)
         {
             PacketType type = (PacketType)reader.ReadByte();
+
+            if (Main.netMode == NetmodeID.Server && !PacketFilter.ValidateServerGuardPacket(whoAmI, type))
+                return;
 
             switch (type)
             {
@@ -120,6 +124,7 @@ namespace ServerGuardMod.Common.Network
 
                 // Apply server data to the player object on the server
                 AccountDatabase.ApplyDataToPlayer(player, savedData);
+                sgPlayer.TrustCurrentServerState("login");
 
                 // Send success + data to client
                 var pkt = ServerGuardMod.CreatePacket(PacketType.LoginSuccess);
@@ -130,6 +135,7 @@ namespace ServerGuardMod.Common.Network
                 ServerGuardMod.Instance.Logger.Info(
                     $"[Login] {username} logged in (IP: {savedData.LastIP})"
                 );
+                AccountDatabase.Save();
                 Main.NewText($"[ServerGuard] {username} joined the server", Color.Green);
             }
             else
@@ -185,6 +191,9 @@ namespace ServerGuardMod.Common.Network
 
             var newData = AccountDatabase.GetAccount(username);
             if (newData == null) { SendFail(whoAmI, "Internal error, try again"); return; }
+
+            AccountDatabase.ApplyDataToPlayer(player, newData);
+            sgPlayer.TrustCurrentServerState("register");
 
             var pkt = ServerGuardMod.CreatePacket(PacketType.LoginSuccess);
             pkt.Write(username);

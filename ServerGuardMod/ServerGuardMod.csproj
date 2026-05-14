@@ -1,17 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AssemblyName>ServerGuardMod</AssemblyName>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12.0</LangVersion>
+    <BuildMod Condition="'$(BuildMod)' == ''">false</BuildMod>
   </PropertyGroup>
 
+  <Import Project="tModLoader\tMLMod.targets" Condition="Exists('tModLoader\tMLMod.targets')" />
+
   <ItemGroup>
-    <!-- مسار tModLoader - عدّل المسار حسب جهازك -->
-    <Reference Include="tModLoader">
-      <HintPath>$(SteamPath)\steamapps\common\tModLoader\tModLoader.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <Compile Remove="tModLoader\**" />
+    <None Remove="tModLoader\**" />
+    <Content Remove="tModLoader\**" />
+    <AdditionalFiles Remove="tModLoader\**" />
   </ItemGroup>
 </Project>

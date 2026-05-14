@@ -321,7 +321,15 @@ namespace ServerGuardMod.Common.Commands
             target.inventory[slot].stack = Math.Min(stack, target.inventory[slot].maxStack);
 
             var sg = target.GetModPlayer<SGPlayer>();
-            if (sg.IsLoggedIn) AccountDatabase.SavePlayerData(target, sg.Username);
+            if (sg.IsLoggedIn)
+            {
+                AccountDatabase.SavePlayerData(target, sg.Username);
+                sg.TrustCurrentServerState("admin give");
+
+                var account = AccountDatabase.GetAccount(sg.Username);
+                if (account != null)
+                    AccountDatabase.SendPlayerData(target.whoAmI, account);
+            }
 
             caller.Reply($"Gave {target.name}: {target.inventory[slot].Name} x{stack}", Color.Green);
         }
@@ -366,6 +374,9 @@ namespace ServerGuardMod.Common.Commands
             if (args.Length < 3) { caller.Reply("Usage: /sg setadmin <name> <true/false>", Color.Red); return; }
             bool val = args[2].ToLower() == "true";
             bool ok  = AccountDatabase.SetAdmin(args[1], val);
+            var online = FindPlayer(args[1]);
+            if (ok && online != null)
+                online.GetModPlayer<SGPlayer>().IsAdmin = val;
             caller.Reply(ok ? $"{args[1]} admin = {val}" : "Account not found", ok ? Color.Green : Color.Red);
         }
 

@@ -6,7 +6,7 @@ namespace ServerGuardMod
 {
     public class ServerGuardMod : Mod
     {
-        public static ServerGuardMod Instance;
+        public static ServerGuardMod Instance = null!;
 
         public static ModPacket CreatePacket(PacketType type)
         {
@@ -23,7 +23,7 @@ namespace ServerGuardMod
 
         public override void Unload()
         {
-            Instance = null;
+            Instance = null!;
         }
 
         public override void HandlePacket(System.IO.BinaryReader reader, int whoAmI)
